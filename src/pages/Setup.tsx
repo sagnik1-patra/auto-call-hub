@@ -5,24 +5,54 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Upload } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import * as XLSX from "xlsx";
 
 const Setup = () => {
   const navigate = useNavigate();
-  const [deviceId, setDeviceId] = useState("");
-  const [excelPath, setExcelPath] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [phoneNumbers, setPhoneNumbers] = useState<string[]>([]);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFileName(file.name);
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        
+        const numbers = jsonData
+          .map((row: any) => String(row.Number || row.number || row.Phone || row.phone || "").trim())
+          .filter(num => num && num !== "nan");
+        
+        setPhoneNumbers(numbers);
+        toast.success(`Loaded ${numbers.length} phone numbers`);
+      } catch (error) {
+        toast.error("Failed to read Excel file");
+        console.error(error);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!deviceId || !excelPath) {
-      toast.error("Please fill all fields");
+    if (phoneNumbers.length === 0) {
+      toast.error("Please upload an Excel file with phone numbers");
       return;
     }
     
-    localStorage.setItem("device_id", deviceId);
-    localStorage.setItem("excel_path", excelPath);
+    localStorage.setItem("phone_numbers", JSON.stringify(phoneNumbers));
+    localStorage.setItem("file_name", fileName);
     
     toast.success("Setup saved successfully!", {
       description: "Redirecting to call launcher...",
@@ -54,36 +84,39 @@ const Setup = () => {
             
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="device-id">Device ID</Label>
-                <Input
-                  id="device-id"
-                  type="text"
-                  placeholder="e.g., emulator-5554 or device serial number"
-                  value={deviceId}
-                  onChange={(e) => setDeviceId(e.target.value)}
-                  className="bg-input border-border"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Your ADB device ID (use 'adb devices' to find it)
-                </p>
+                <Label htmlFor="excel-file">Excel File with Phone Numbers</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="excel-file"
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleFileUpload}
+                    className="bg-input border-border"
+                  />
+                  <Button type="button" variant="outline" size="icon" asChild>
+                    <label htmlFor="excel-file" className="cursor-pointer">
+                      <Upload className="w-4 h-4" />
+                    </label>
+                  </Button>
+                </div>
+                {fileName && (
+                  <p className="text-xs text-muted-foreground">
+                    ✓ {fileName} - {phoneNumbers.length} numbers loaded
+                  </p>
+                )}
+                {!fileName && (
+                  <p className="text-xs text-muted-foreground">
+                    Upload Excel file with a "Number" column containing phone numbers
+                  </p>
+                )}
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="excel-path">Excel File Path</Label>
-                <Input
-                  id="excel-path"
-                  type="text"
-                  placeholder="e.g., C:\Users\...\contacts.xlsx"
-                  value={excelPath}
-                  onChange={(e) => setExcelPath(e.target.value)}
-                  className="bg-input border-border"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Full path to your Excel file with phone numbers
-                </p>
-              </div>
-              
-              <Button type="submit" className="w-full gap-2" variant="success">
+              <Button 
+                type="submit" 
+                className="w-full gap-2" 
+                variant="success"
+                disabled={phoneNumbers.length === 0}
+              >
                 Save & Proceed
                 <ArrowRight className="w-4 h-4" />
               </Button>

@@ -1,98 +1,81 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Download, Phone } from "lucide-react";
+import { Phone, FileText } from "lucide-react";
 import Navbar from "@/components/Navbar";
 
 const Call = () => {
   const navigate = useNavigate();
-  const [deviceId, setDeviceId] = useState("");
-  const [excelPath, setExcelPath] = useState("");
-  const [isSimulating, setIsSimulating] = useState(false);
+  const [fileName, setFileName] = useState("");
+  const [phoneNumbers, setPhoneNumbers] = useState<string[]>([]);
+  const [isCalling, setIsCalling] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
-    const savedDeviceId = localStorage.getItem("device_id");
-    const savedExcelPath = localStorage.getItem("excel_path");
+    const savedNumbers = localStorage.getItem("phone_numbers");
+    const savedFileName = localStorage.getItem("file_name");
     
-    if (!savedDeviceId || !savedExcelPath) {
+    if (!savedNumbers) {
       toast.error("Please complete setup first");
       navigate("/setup");
       return;
     }
     
-    setDeviceId(savedDeviceId);
-    setExcelPath(savedExcelPath);
+    setPhoneNumbers(JSON.parse(savedNumbers));
+    setFileName(savedFileName || "contacts.xlsx");
   }, [navigate]);
 
-  const generatePythonScript = () => {
-    const script = `import os, pandas as pd, time
-
-ADB = r"C:\\\\Users\\\\NXTWAVE\\\\Downloads\\\\platform-tools-latest-windows\\\\platform-tools\\\\adb.exe"
-DEVICE_ID = "${deviceId}"
-EXCEL_PATH = r"${excelPath}"
-
-df = pd.read_excel(EXCEL_PATH)
-
-for _, row in df.iterrows():
-    number = str(row["Number"]).strip()
-    if not number or number.lower() == "nan":
-        continue
-    
-    cmd = f'"{ADB}" -s {DEVICE_ID} shell am start -a android.intent.action.CALL -d tel:{number}'
-    os.system(cmd)
-    print(f"[SUCCESS] Call initiated for {number}")
-    time.sleep(10)
-
-print("\\n[COMPLETE] All calls have been processed.")
-`;
-    
-    const blob = new Blob([script], { type: "text/x-python" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "call_automation.py";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast.success("Python script downloaded!");
+  const makeCall = async (phoneNumber: string) => {
+    return new Promise<void>((resolve) => {
+      // Request permission and initiate call
+      const callUrl = `tel:${phoneNumber}`;
+      window.location.href = callUrl;
+      
+      // Log the call
+      const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
+      logs.push({
+        number: phoneNumber,
+        timestamp: new Date().toISOString(),
+        status: "initiated"
+      });
+      localStorage.setItem("call_logs", JSON.stringify(logs));
+      
+      toast.success(`Calling ${phoneNumber}...`);
+      
+      // Wait 10 seconds before next call (simulating call duration)
+      setTimeout(resolve, 10000);
+    });
   };
 
-  const simulateCalling = () => {
-    setIsSimulating(true);
+  const startCalling = async () => {
+    if (phoneNumbers.length === 0) {
+      toast.error("No phone numbers to call");
+      return;
+    }
+
+    setIsCalling(true);
     
-    // Simulate call progress
-    const numbers = ["555-0100", "555-0101", "555-0102", "555-0103"];
-    let count = 0;
-    
-    const interval = setInterval(() => {
-      if (count < numbers.length) {
-        toast.success(`Call initiated: ${numbers[count]}`);
-        
-        // Save to call log
-        const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
-        logs.push({
-          number: numbers[count],
-          timestamp: new Date().toISOString(),
-          status: "success"
-        });
-        localStorage.setItem("call_logs", JSON.stringify(logs));
-        
-        count++;
-      } else {
-        clearInterval(interval);
-        setIsSimulating(false);
-        toast.success("All calls completed!", {
-          description: "View the call log for details",
-        });
-        setTimeout(() => navigate("/log"), 1500);
+    for (let i = 0; i < phoneNumbers.length; i++) {
+      setCurrentIndex(i);
+      
+      // Show confirmation dialog before each call
+      const proceed = window.confirm(`Call ${phoneNumbers[i]}?\n\n${i + 1} of ${phoneNumbers.length}`);
+      
+      if (!proceed) {
+        toast.info("Calling stopped by user");
+        break;
       }
-    }, 2000);
+      
+      await makeCall(phoneNumbers[i]);
+    }
+    
+    setIsCalling(false);
+    toast.success("All calls completed!", {
+      description: "View the call log for details",
+    });
+    setTimeout(() => navigate("/log"), 1500);
   };
 
   return (
@@ -117,53 +100,50 @@ print("\\n[COMPLETE] All calls have been processed.")
             </div>
             
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Device ID</Label>
-                <Input
-                  type="text"
-                  value={deviceId}
-                  readOnly
-                  className="bg-secondary border-border text-muted-foreground"
-                />
+              <div className="bg-secondary/50 border border-border rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="w-4 h-4 text-primary" />
+                  <h3 className="text-sm font-semibold text-foreground">Loaded File</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">{fileName}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {phoneNumbers.length} phone numbers ready to call
+                </p>
               </div>
               
-              <div className="space-y-2">
-                <Label>Excel File Path</Label>
-                <Input
-                  type="text"
-                  value={excelPath}
-                  readOnly
-                  className="bg-secondary border-border text-muted-foreground"
-                />
-              </div>
+              {isCalling && (
+                <div className="bg-primary/10 border border-primary rounded-lg p-4">
+                  <p className="text-sm font-medium text-foreground">
+                    Calling: {currentIndex + 1} of {phoneNumbers.length}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Current: {phoneNumbers[currentIndex]}
+                  </p>
+                </div>
+              )}
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+            <div className="pt-4">
               <Button 
-                onClick={simulateCalling} 
-                disabled={isSimulating}
-                className="gap-2"
+                onClick={startCalling} 
+                disabled={isCalling || phoneNumbers.length === 0}
+                className="w-full gap-2"
                 variant="success"
+                size="lg"
               >
-                <Phone className="w-4 h-4" />
-                {isSimulating ? "Calling..." : "Start Calling"}
-              </Button>
-              
-              <Button 
-                onClick={generatePythonScript}
-                variant="outline"
-                className="gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Download Python Script
+                <Phone className="w-5 h-5" />
+                {isCalling ? "Calling..." : `Start Calling (${phoneNumbers.length} numbers)`}
               </Button>
             </div>
             
             <div className="bg-secondary/50 border border-border rounded-lg p-4">
-              <h3 className="text-sm font-semibold mb-2 text-foreground">Note:</h3>
-              <p className="text-xs text-muted-foreground">
-                The "Start Calling" button simulates the process. Download the Python script to run actual ADB calls on your device.
-              </p>
+              <h3 className="text-sm font-semibold mb-2 text-foreground">📱 Mobile App Features:</h3>
+              <ul className="text-xs text-muted-foreground space-y-1">
+                <li>✓ Direct phone calls with permission</li>
+                <li>✓ Upload Excel files directly from your device</li>
+                <li>✓ Automatic call logging</li>
+                <li>✓ Confirmation before each call</li>
+              </ul>
             </div>
           </div>
         </Card>
