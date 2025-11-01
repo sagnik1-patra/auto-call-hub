@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,32 +6,79 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const [signInData, setSignInData] = useState({ username: "", password: "" });
-  const [signUpData, setSignUpData] = useState({ username: "", email: "", password: "" });
+  const [signInData, setSignInData] = useState({ email: "", password: "" });
+  const [signUpData, setSignUpData] = useState({ email: "", password: "" });
+  const [loading, setLoading] = useState(false);
 
-  const handleSignIn = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!signInData.username) {
-      toast.error("Please enter a username");
-      return;
-    }
-    localStorage.setItem("username", signInData.username);
-    toast.success("Signed in successfully!");
-    setTimeout(() => navigate("/setup"), 500);
-  };
+  useEffect(() => {
+    // Check if user is already logged in
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate("/setup");
+      }
+    });
 
-  const handleSignUp = (e: React.FormEvent) => {
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        navigate("/setup");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!signUpData.username || !signUpData.email) {
+    if (!signInData.email || !signInData.password) {
       toast.error("Please fill all fields");
       return;
     }
-    localStorage.setItem("username", signUpData.username);
+
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: signInData.email,
+      password: signInData.password,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success("Signed in successfully!");
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!signUpData.email || !signUpData.password) {
+      toast.error("Please fill all fields");
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await supabase.auth.signUp({
+      email: signUpData.email,
+      password: signUpData.password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/setup`
+      }
+    });
+
+    setLoading(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
     toast.success("Account created successfully!");
-    setTimeout(() => navigate("/setup"), 500);
   };
 
   return (
@@ -61,14 +108,15 @@ const Auth = () => {
             
             <form onSubmit={handleSignIn} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="signin-username">Username</Label>
+                <Label htmlFor="signin-email">Email</Label>
                 <Input
-                  id="signin-username"
-                  type="text"
-                  placeholder="Enter your username"
-                  value={signInData.username}
-                  onChange={(e) => setSignInData({ ...signInData, username: e.target.value })}
+                  id="signin-email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={signInData.email}
+                  onChange={(e) => setSignInData({ ...signInData, email: e.target.value })}
                   className="bg-input border-border"
+                  disabled={loading}
                 />
               </div>
               
@@ -81,11 +129,12 @@ const Auth = () => {
                   value={signInData.password}
                   onChange={(e) => setSignInData({ ...signInData, password: e.target.value })}
                   className="bg-input border-border"
+                  disabled={loading}
                 />
               </div>
               
-              <Button type="submit" className="w-full" variant="success">
-                Sign In
+              <Button type="submit" className="w-full" variant="success" disabled={loading}>
+                {loading ? "Signing In..." : "Sign In"}
               </Button>
             </form>
           </TabsContent>
@@ -98,18 +147,6 @@ const Auth = () => {
             
             <form onSubmit={handleSignUp} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="signup-username">Username</Label>
-                <Input
-                  id="signup-username"
-                  type="text"
-                  placeholder="Choose a username"
-                  value={signUpData.username}
-                  onChange={(e) => setSignUpData({ ...signUpData, username: e.target.value })}
-                  className="bg-input border-border"
-                />
-              </div>
-              
-              <div className="space-y-2">
                 <Label htmlFor="signup-email">Email</Label>
                 <Input
                   id="signup-email"
@@ -118,6 +155,7 @@ const Auth = () => {
                   value={signUpData.email}
                   onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
                   className="bg-input border-border"
+                  disabled={loading}
                 />
               </div>
               
@@ -126,15 +164,16 @@ const Auth = () => {
                 <Input
                   id="signup-password"
                   type="password"
-                  placeholder="Create a password"
+                  placeholder="Create a password (min 6 characters)"
                   value={signUpData.password}
                   onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
                   className="bg-input border-border"
+                  disabled={loading}
                 />
               </div>
               
-              <Button type="submit" className="w-full" variant="success">
-                Sign Up
+              <Button type="submit" className="w-full" variant="success" disabled={loading}>
+                {loading ? "Creating Account..." : "Sign Up"}
               </Button>
             </form>
           </TabsContent>
