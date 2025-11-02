@@ -52,7 +52,8 @@ const Call = () => {
           break;
       }
       
-      window.location.href = actionUrl;
+      // Use window.open to avoid navigating away from the page
+      window.open(actionUrl, '_blank');
       
       // Log the action
       const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
