@@ -30,42 +30,50 @@ const Call = () => {
 
   const performAction = async (phoneNumber: string) => {
     return new Promise<void>((resolve) => {
-      const message = "Your Son/daughter did not come to college today";
-      let actionUrl = "";
-      let status = "";
-      
-      switch (actionType) {
-        case "call":
-          actionUrl = `tel:${phoneNumber}`;
-          status = "call initiated";
-          toast.success(`Calling ${phoneNumber}...`);
-          break;
-        case "sms":
-          actionUrl = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
-          status = "sms sent";
-          toast.success(`Sending SMS to ${phoneNumber}...`);
-          break;
-        case "whatsapp":
-          actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(message)}`;
-          status = "whatsapp sent";
-          toast.success(`Sending WhatsApp to ${phoneNumber}...`);
-          break;
+      try {
+        const message = "Your Son/daughter did not come to college today";
+        let actionUrl = "";
+        let status = "";
+        
+        switch (actionType) {
+          case "call":
+            actionUrl = `tel:${phoneNumber}`;
+            status = "call initiated";
+            toast.success(`Calling ${phoneNumber}...`);
+            break;
+          case "sms":
+            actionUrl = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
+            status = "sms sent";
+            toast.success(`Sending SMS to ${phoneNumber}...`);
+            break;
+          case "whatsapp":
+            actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(message)}`;
+            status = "whatsapp sent";
+            toast.success(`Sending WhatsApp to ${phoneNumber}...`);
+            break;
+        }
+        
+        // Use window.open to avoid navigating away from the page
+        window.open(actionUrl, '_blank');
+        
+        // Log the action
+        const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
+        logs.push({
+          number: phoneNumber,
+          timestamp: new Date().toISOString(),
+          status: status
+        });
+        localStorage.setItem("call_logs", JSON.stringify(logs));
+      } catch (error) {
+        console.error('Error performing action:', error);
+        toast.error(`Error processing ${phoneNumber}`);
       }
       
-      // Use window.open to avoid navigating away from the page
-      window.open(actionUrl, '_blank');
-      
-      // Log the action
-      const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
-      logs.push({
-        number: phoneNumber,
-        timestamp: new Date().toISOString(),
-        status: status
-      });
-      localStorage.setItem("call_logs", JSON.stringify(logs));
-      
-      // Wait 10 seconds before next action
-      setTimeout(resolve, 10000);
+      // Always resolve after 10 seconds to continue to next number
+      setTimeout(() => {
+        console.log(`Completed action for ${phoneNumber}, moving to next`);
+        resolve();
+      }, 10000);
     });
   };
 
