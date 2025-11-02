@@ -12,6 +12,7 @@ const Call = () => {
   const [phoneNumbers, setPhoneNumbers] = useState<string[]>([]);
   const [isCalling, setIsCalling] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [actionType, setActionType] = useState<"call" | "sms" | "whatsapp">("call");
 
   useEffect(() => {
     const savedNumbers = localStorage.getItem("phone_numbers");
@@ -27,31 +28,49 @@ const Call = () => {
     setFileName(savedFileName || "contacts.xlsx");
   }, [navigate]);
 
-  const makeCall = async (phoneNumber: string) => {
+  const performAction = async (phoneNumber: string) => {
     return new Promise<void>((resolve) => {
-      // Request permission and initiate call
-      const callUrl = `tel:${phoneNumber}`;
-      window.location.href = callUrl;
+      const message = "Your Son/daughter did not come to college today";
+      let actionUrl = "";
+      let status = "";
       
-      // Log the call
+      switch (actionType) {
+        case "call":
+          actionUrl = `tel:${phoneNumber}`;
+          status = "call initiated";
+          toast.success(`Calling ${phoneNumber}...`);
+          break;
+        case "sms":
+          actionUrl = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
+          status = "sms sent";
+          toast.success(`Sending SMS to ${phoneNumber}...`);
+          break;
+        case "whatsapp":
+          actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(message)}`;
+          status = "whatsapp sent";
+          toast.success(`Sending WhatsApp to ${phoneNumber}...`);
+          break;
+      }
+      
+      window.location.href = actionUrl;
+      
+      // Log the action
       const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
       logs.push({
         number: phoneNumber,
         timestamp: new Date().toISOString(),
-        status: "initiated"
+        status: status
       });
       localStorage.setItem("call_logs", JSON.stringify(logs));
       
-      toast.success(`Calling ${phoneNumber}...`);
-      
-      // Wait 10 seconds before next call (simulating call duration)
+      // Wait 10 seconds before next action
       setTimeout(resolve, 10000);
     });
   };
 
-  const startCalling = async () => {
+  const startAction = async () => {
     if (phoneNumbers.length === 0) {
-      toast.error("No phone numbers to call");
+      toast.error("No phone numbers available");
       return;
     }
 
@@ -59,12 +78,13 @@ const Call = () => {
     
     for (let i = 0; i < phoneNumbers.length; i++) {
       setCurrentIndex(i);
-      await makeCall(phoneNumbers[i]);
+      await performAction(phoneNumbers[i]);
     }
     
     setIsCalling(false);
-    toast.success("All calls completed!", {
-      description: "View the call log for details",
+    const actionText = actionType === "call" ? "calls" : actionType === "sms" ? "messages" : "WhatsApp messages";
+    toast.success(`All ${actionText} completed!`, {
+      description: "View the log for details",
     });
     setTimeout(() => navigate("/log"), 1500);
   };
@@ -85,9 +105,9 @@ const Call = () => {
         
         <Card className="w-full max-w-2xl relative z-10 bg-gradient-card backdrop-blur-xl border-border/50 p-8 animate-fade-in">
           <div className="space-y-6">
-            <div className="space-y-2 text-center">
-              <h1 className="text-3xl font-bold text-foreground">Call Launcher</h1>
-              <p className="text-muted-foreground">Review your configuration and start calling</p>
+          <div className="space-y-2 text-center">
+              <h1 className="text-3xl font-bold text-foreground">Communication Launcher</h1>
+              <p className="text-muted-foreground">Choose your method and start contacting</p>
             </div>
             
             <div className="space-y-4">
@@ -98,14 +118,49 @@ const Call = () => {
                 </div>
                 <p className="text-sm text-muted-foreground">{fileName}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {phoneNumbers.length} phone numbers ready to call
+                  {phoneNumbers.length} phone numbers ready
                 </p>
+              </div>
+              
+              <div className="bg-secondary/50 border border-border rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-foreground mb-3">Choose Action</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    onClick={() => setActionType("call")}
+                    variant={actionType === "call" ? "default" : "outline"}
+                    className="w-full"
+                    size="sm"
+                  >
+                    📞 Call
+                  </Button>
+                  <Button
+                    onClick={() => setActionType("sms")}
+                    variant={actionType === "sms" ? "default" : "outline"}
+                    className="w-full"
+                    size="sm"
+                  >
+                    💬 SMS
+                  </Button>
+                  <Button
+                    onClick={() => setActionType("whatsapp")}
+                    variant={actionType === "whatsapp" ? "default" : "outline"}
+                    className="w-full"
+                    size="sm"
+                  >
+                    📱 WhatsApp
+                  </Button>
+                </div>
+                {(actionType === "sms" || actionType === "whatsapp") && (
+                  <p className="text-xs text-muted-foreground mt-3 p-2 bg-primary/10 rounded">
+                    Message: "Your Son/daughter did not come to college today"
+                  </p>
+                )}
               </div>
               
               {isCalling && (
                 <div className="bg-primary/10 border border-primary rounded-lg p-4">
                   <p className="text-sm font-medium text-foreground">
-                    Calling: {currentIndex + 1} of {phoneNumbers.length}
+                    Processing: {currentIndex + 1} of {phoneNumbers.length}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Current: {phoneNumbers[currentIndex]}
@@ -116,24 +171,27 @@ const Call = () => {
             
             <div className="pt-4">
               <Button 
-                onClick={startCalling} 
+                onClick={startAction} 
                 disabled={isCalling || phoneNumbers.length === 0}
                 className="w-full gap-2"
                 variant="success"
                 size="lg"
               >
                 <Phone className="w-5 h-5" />
-                {isCalling ? "Calling..." : `Start Calling (${phoneNumbers.length} numbers)`}
+                {isCalling 
+                  ? "Processing..." 
+                  : `Send ${actionType === "call" ? "Calls" : actionType === "sms" ? "SMS" : "WhatsApp"} (${phoneNumbers.length} numbers)`
+                }
               </Button>
             </div>
             
             <div className="bg-secondary/50 border border-border rounded-lg p-4">
               <h3 className="text-sm font-semibold mb-2 text-foreground">📱 Mobile App Features:</h3>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>✓ Automatic sequential calling</li>
+                <li>✓ Make calls, send SMS, or WhatsApp messages</li>
                 <li>✓ Upload Excel files directly from your device</li>
-                <li>✓ Automatic call logging</li>
-                <li>✓ 10-second delay between calls</li>
+                <li>✓ Automatic action logging</li>
+                <li>✓ 10-second delay between actions</li>
               </ul>
             </div>
           </div>
