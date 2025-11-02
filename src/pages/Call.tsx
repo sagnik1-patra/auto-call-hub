@@ -59,15 +59,6 @@ const Call = () => {
     
     for (let i = 0; i < phoneNumbers.length; i++) {
       setCurrentIndex(i);
-      
-      // Show confirmation dialog before each call
-      const proceed = window.confirm(`Call ${phoneNumbers[i]}?\n\n${i + 1} of ${phoneNumbers.length}`);
-      
-      if (!proceed) {
-        toast.info("Calling stopped by user");
-        break;
-      }
-      
       await makeCall(phoneNumbers[i]);
     }
     
@@ -139,10 +130,10 @@ const Call = () => {
             <div className="bg-secondary/50 border border-border rounded-lg p-4">
               <h3 className="text-sm font-semibold mb-2 text-foreground">📱 Mobile App Features:</h3>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>✓ Direct phone calls with permission</li>
+                <li>✓ Automatic sequential calling</li>
                 <li>✓ Upload Excel files directly from your device</li>
                 <li>✓ Automatic call logging</li>
-                <li>✓ Confirmation before each call</li>
+                <li>✓ 10-second delay between calls</li>
               </ul>
             </div>
           </div>
