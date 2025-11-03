@@ -83,8 +83,8 @@ const Call = () => {
         localStorage.setItem("call_logs", JSON.stringify(logs));
       }
       
-      // Short delay: 10 seconds for calls, 3 seconds for SMS/WhatsApp
-      const delayTime = actionType === "call" ? 10000 : 3000;
+      // Short delay: 5 seconds for calls, 3 seconds for SMS/WhatsApp
+      const delayTime = actionType === "call" ? 5000 : 3000;
       console.log(`⏱️ Waiting ${delayTime/1000}s before next action...`);
       
       setTimeout(() => {
@@ -203,7 +203,7 @@ const Call = () => {
                     📞 Current: {phoneNumbers[currentIndex]}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    ⏱️ Next in: {actionType === "call" ? "10s" : "3s"} after action
+                    ⏱️ Next in: {actionType === "call" ? "5s" : "3s"} after action
                   </p>
                 </div>
               )}
@@ -229,7 +229,7 @@ const Call = () => {
               <h3 className="text-sm font-semibold mb-2 text-foreground">📱 How It Works:</h3>
               <ul className="text-xs text-muted-foreground space-y-1">
                 <li>✓ Sequential processing - one at a time</li>
-                <li>✓ Calls: Auto-moves to next after 10 seconds</li>
+                <li>✓ Calls: Auto-opens next call in 5 seconds</li>
                 <li>✓ SMS/WhatsApp: 3-second delay between each</li>
                 <li>✓ All actions logged with timestamps</li>
                 <li>✓ Live progress tracking</li>
