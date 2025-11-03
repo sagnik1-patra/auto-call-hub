@@ -13,6 +13,7 @@ const Call = () => {
   const [isCalling, setIsCalling] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [actionType, setActionType] = useState<"call" | "sms" | "whatsapp">("call");
+  const [broadcastMode, setBroadcastMode] = useState(false);
 
   useEffect(() => {
     const savedNumbers = localStorage.getItem("phone_numbers");
@@ -83,8 +84,8 @@ const Call = () => {
         localStorage.setItem("call_logs", JSON.stringify(logs));
       }
       
-      // Short delay: 5 seconds for calls, 3 seconds for SMS/WhatsApp
-      const delayTime = actionType === "call" ? 5000 : 3000;
+      // Short delay: 5 seconds for calls, 3 seconds for SMS, 500ms for WhatsApp broadcast
+      const delayTime = actionType === "call" ? 5000 : (actionType === "whatsapp" && broadcastMode) ? 500 : 3000;
       console.log(`⏱️ Waiting ${delayTime/1000}s before next action...`);
       
       setTimeout(() => {
@@ -101,6 +102,12 @@ const Call = () => {
     }
 
     setIsCalling(true);
+    
+    if (actionType === "whatsapp" && broadcastMode) {
+      toast.success(`📱 Broadcasting to ${phoneNumbers.length} numbers...`, {
+        description: "Opening all WhatsApp chats quickly"
+      });
+    }
     
     for (let i = 0; i < phoneNumbers.length; i++) {
       setCurrentIndex(i);
@@ -152,7 +159,10 @@ const Call = () => {
                 <h3 className="text-sm font-semibold text-foreground mb-3">Choose Action</h3>
                 <div className="grid grid-cols-3 gap-2">
                   <Button
-                    onClick={() => setActionType("call")}
+                    onClick={() => {
+                      setActionType("call");
+                      setBroadcastMode(false);
+                    }}
                     variant={actionType === "call" ? "default" : "outline"}
                     className="w-full"
                     size="sm"
@@ -160,7 +170,10 @@ const Call = () => {
                     📞 Call
                   </Button>
                   <Button
-                    onClick={() => setActionType("sms")}
+                    onClick={() => {
+                      setActionType("sms");
+                      setBroadcastMode(false);
+                    }}
                     variant={actionType === "sms" ? "default" : "outline"}
                     className="w-full"
                     size="sm"
@@ -168,7 +181,10 @@ const Call = () => {
                     💬 SMS
                   </Button>
                   <Button
-                    onClick={() => setActionType("whatsapp")}
+                    onClick={() => {
+                      setActionType("whatsapp");
+                      setBroadcastMode(false);
+                    }}
                     variant={actionType === "whatsapp" ? "default" : "outline"}
                     className="w-full"
                     size="sm"
@@ -176,7 +192,28 @@ const Call = () => {
                     📱 WhatsApp
                   </Button>
                 </div>
-                {(actionType === "sms" || actionType === "whatsapp") && (
+                
+                {actionType === "whatsapp" && (
+                  <div className="mt-3 p-3 bg-primary/10 border border-primary/20 rounded-lg space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="broadcast"
+                        checked={broadcastMode}
+                        onChange={(e) => setBroadcastMode(e.target.checked)}
+                        className="w-4 h-4 rounded"
+                      />
+                      <label htmlFor="broadcast" className="text-xs font-medium text-foreground cursor-pointer">
+                        🚀 Broadcast Mode (Opens all chats quickly)
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Message: "Your Son/daughter did not come to college today"
+                    </p>
+                  </div>
+                )}
+                
+                {actionType === "sms" && (
                   <p className="text-xs text-muted-foreground mt-3 p-2 bg-primary/10 rounded">
                     Message: "Your Son/daughter did not come to college today"
                   </p>
@@ -203,7 +240,7 @@ const Call = () => {
                     📞 Current: {phoneNumbers[currentIndex]}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    ⏱️ Next in: {actionType === "call" ? "5s" : "3s"} after action
+                    ⏱️ Next in: {actionType === "call" ? "5s" : (actionType === "whatsapp" && broadcastMode) ? "0.5s" : "3s"} after action
                   </p>
                 </div>
               )}
@@ -230,7 +267,8 @@ const Call = () => {
               <ul className="text-xs text-muted-foreground space-y-1">
                 <li>✓ Sequential processing - one at a time</li>
                 <li>✓ Calls: Auto-opens next call in 5 seconds</li>
-                <li>✓ SMS/WhatsApp: 3-second delay between each</li>
+                <li>✓ SMS: 3-second delay between each</li>
+                <li>✓ WhatsApp: 3s delay (or 0.5s in broadcast mode)</li>
                 <li>✓ All actions logged with timestamps</li>
                 <li>✓ Live progress tracking</li>
               </ul>
