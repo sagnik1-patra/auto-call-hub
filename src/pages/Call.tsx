@@ -34,30 +34,26 @@ const Call = () => {
         const message = "Your Son/daughter did not come to college today";
         let actionUrl = "";
         let status = "";
-        let delayTime = 5000; // Default 5 seconds for SMS/WhatsApp
         
         switch (actionType) {
           case "call":
             actionUrl = `tel:${phoneNumber}`;
             status = "call initiated";
-            delayTime = 30000; // 30 seconds for calls (time for call to be answered/rejected)
-            toast.success(`Calling ${phoneNumber}...`);
+            toast.success(`📞 Calling ${phoneNumber}...`);
             break;
           case "sms":
             actionUrl = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
             status = "sms sent";
-            delayTime = 5000; // 5 seconds for SMS
-            toast.success(`Sending SMS to ${phoneNumber}...`);
+            toast.success(`💬 Sending SMS to ${phoneNumber}...`);
             break;
           case "whatsapp":
             actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(message)}`;
             status = "whatsapp sent";
-            delayTime = 5000; // 5 seconds for WhatsApp
-            toast.success(`Sending WhatsApp to ${phoneNumber}...`);
+            toast.success(`📱 Sending WhatsApp to ${phoneNumber}...`);
             break;
         }
         
-        // Use window.open to avoid navigating away from the page
+        // Open the action URL
         window.open(actionUrl, '_blank');
         
         // Log the action with detailed info
@@ -70,10 +66,10 @@ const Call = () => {
         });
         localStorage.setItem("call_logs", JSON.stringify(logs));
         
-        console.log(`✓ Action ${actionType} completed for ${phoneNumber}, waiting ${delayTime/1000}s before next`);
+        console.log(`✓ ${actionType.toUpperCase()} initiated for ${phoneNumber}`);
       } catch (error) {
         console.error('Error performing action:', error);
-        toast.error(`Error processing ${phoneNumber}`);
+        toast.error(`❌ Error processing ${phoneNumber}`);
         
         // Log failed action
         const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
@@ -87,10 +83,12 @@ const Call = () => {
         localStorage.setItem("call_logs", JSON.stringify(logs));
       }
       
-      // Action-specific delay before continuing to next number
-      const delayTime = actionType === "call" ? 30000 : 5000;
+      // Short delay: 10 seconds for calls, 3 seconds for SMS/WhatsApp
+      const delayTime = actionType === "call" ? 10000 : 3000;
+      console.log(`⏱️ Waiting ${delayTime/1000}s before next action...`);
+      
       setTimeout(() => {
-        console.log(`Moving to next number after ${delayTime/1000}s delay`);
+        console.log(`✅ Moving to next number`);
         resolve();
       }, delayTime);
     });
@@ -186,7 +184,7 @@ const Call = () => {
               </div>
               
               {isCalling && (
-                <div className="bg-primary/10 border border-primary rounded-lg p-4 space-y-3">
+                <div className="bg-primary/10 border border-primary rounded-lg p-4 space-y-3 animate-pulse">
                   <div className="flex justify-between items-center">
                     <p className="text-sm font-medium text-foreground">
                       Processing: {currentIndex + 1} of {phoneNumbers.length}
@@ -202,10 +200,10 @@ const Call = () => {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Current: {phoneNumbers[currentIndex]}
+                    📞 Current: {phoneNumbers[currentIndex]}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    ⏱️ Delay: {actionType === "call" ? "30s" : "5s"} between actions
+                    ⏱️ Next in: {actionType === "call" ? "10s" : "3s"} after action
                   </p>
                 </div>
               )}
@@ -231,10 +229,10 @@ const Call = () => {
               <h3 className="text-sm font-semibold mb-2 text-foreground">📱 How It Works:</h3>
               <ul className="text-xs text-muted-foreground space-y-1">
                 <li>✓ Sequential processing - one at a time</li>
-                <li>✓ Calls: 30-second delay between each</li>
-                <li>✓ SMS/WhatsApp: 5-second delay between each</li>
+                <li>✓ Calls: Auto-moves to next after 10 seconds</li>
+                <li>✓ SMS/WhatsApp: 3-second delay between each</li>
                 <li>✓ All actions logged with timestamps</li>
-                <li>✓ Progress tracking with percentage</li>
+                <li>✓ Live progress tracking</li>
               </ul>
             </div>
           </div>
