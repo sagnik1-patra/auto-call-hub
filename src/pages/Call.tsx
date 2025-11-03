@@ -34,21 +34,25 @@ const Call = () => {
         const message = "Your Son/daughter did not come to college today";
         let actionUrl = "";
         let status = "";
+        let delayTime = 5000; // Default 5 seconds for SMS/WhatsApp
         
         switch (actionType) {
           case "call":
             actionUrl = `tel:${phoneNumber}`;
             status = "call initiated";
+            delayTime = 30000; // 30 seconds for calls (time for call to be answered/rejected)
             toast.success(`Calling ${phoneNumber}...`);
             break;
           case "sms":
             actionUrl = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
             status = "sms sent";
+            delayTime = 5000; // 5 seconds for SMS
             toast.success(`Sending SMS to ${phoneNumber}...`);
             break;
           case "whatsapp":
             actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(message)}`;
             status = "whatsapp sent";
+            delayTime = 5000; // 5 seconds for WhatsApp
             toast.success(`Sending WhatsApp to ${phoneNumber}...`);
             break;
         }
@@ -56,24 +60,39 @@ const Call = () => {
         // Use window.open to avoid navigating away from the page
         window.open(actionUrl, '_blank');
         
-        // Log the action
+        // Log the action with detailed info
         const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
         logs.push({
           number: phoneNumber,
           timestamp: new Date().toISOString(),
-          status: status
+          status: status,
+          type: actionType
         });
         localStorage.setItem("call_logs", JSON.stringify(logs));
+        
+        console.log(`✓ Action ${actionType} completed for ${phoneNumber}, waiting ${delayTime/1000}s before next`);
       } catch (error) {
         console.error('Error performing action:', error);
         toast.error(`Error processing ${phoneNumber}`);
+        
+        // Log failed action
+        const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
+        logs.push({
+          number: phoneNumber,
+          timestamp: new Date().toISOString(),
+          status: "failed",
+          type: actionType,
+          error: String(error)
+        });
+        localStorage.setItem("call_logs", JSON.stringify(logs));
       }
       
-      // Always resolve after 10 seconds to continue to next number
+      // Action-specific delay before continuing to next number
+      const delayTime = actionType === "call" ? 30000 : 5000;
       setTimeout(() => {
-        console.log(`Completed action for ${phoneNumber}, moving to next`);
+        console.log(`Moving to next number after ${delayTime/1000}s delay`);
         resolve();
-      }, 10000);
+      }, delayTime);
     });
   };
 
@@ -167,12 +186,26 @@ const Call = () => {
               </div>
               
               {isCalling && (
-                <div className="bg-primary/10 border border-primary rounded-lg p-4">
-                  <p className="text-sm font-medium text-foreground">
-                    Processing: {currentIndex + 1} of {phoneNumbers.length}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                <div className="bg-primary/10 border border-primary rounded-lg p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm font-medium text-foreground">
+                      Processing: {currentIndex + 1} of {phoneNumbers.length}
+                    </p>
+                    <span className="text-xs text-primary font-semibold">
+                      {Math.round(((currentIndex + 1) / phoneNumbers.length) * 100)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-secondary rounded-full h-2">
+                    <div 
+                      className="bg-primary h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${((currentIndex + 1) / phoneNumbers.length) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
                     Current: {phoneNumbers[currentIndex]}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    ⏱️ Delay: {actionType === "call" ? "30s" : "5s"} between actions
                   </p>
                 </div>
               )}
@@ -195,12 +228,13 @@ const Call = () => {
             </div>
             
             <div className="bg-secondary/50 border border-border rounded-lg p-4">
-              <h3 className="text-sm font-semibold mb-2 text-foreground">📱 Mobile App Features:</h3>
+              <h3 className="text-sm font-semibold mb-2 text-foreground">📱 How It Works:</h3>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>✓ Make calls, send SMS, or WhatsApp messages</li>
-                <li>✓ Upload Excel files directly from your device</li>
-                <li>✓ Automatic action logging</li>
-                <li>✓ 10-second delay between actions</li>
+                <li>✓ Sequential processing - one at a time</li>
+                <li>✓ Calls: 30-second delay between each</li>
+                <li>✓ SMS/WhatsApp: 5-second delay between each</li>
+                <li>✓ All actions logged with timestamps</li>
+                <li>✓ Progress tracking with percentage</li>
               </ul>
             </div>
           </div>
