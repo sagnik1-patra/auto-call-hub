@@ -30,74 +30,73 @@ const Call = () => {
   }, [navigate]);
 
   const performAction = async (phoneNumber: string, isLast: boolean) => {
-    try {
-      const message = "Your Son/daughter did not come to college today";
-      let actionUrl = "";
-      let status = "";
-      
-      switch (actionType) {
-        case "call":
-          actionUrl = `tel:${phoneNumber}`;
-          status = "call initiated";
-          toast.success(`📞 Calling ${phoneNumber}...`);
-          break;
-        case "sms":
-          actionUrl = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
-          status = "sms sent";
-          toast.success(`💬 Sending SMS to ${phoneNumber}...`);
-          break;
-        case "whatsapp":
-          actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(message)}`;
-          status = "whatsapp sent";
-          toast.success(`📱 Sending WhatsApp to ${phoneNumber}...`);
-          break;
-      }
-      
-      // Open the action URL
-      window.open(actionUrl, '_blank');
-      
-      // Log the action with detailed info
-      const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
-      logs.push({
-        number: phoneNumber,
-        timestamp: new Date().toISOString(),
-        status: status,
-        type: actionType
-      });
-      localStorage.setItem("call_logs", JSON.stringify(logs));
-      
-      console.log(`✓ ${actionType.toUpperCase()} initiated for ${phoneNumber}`);
-      
-      // Show alert before proceeding to next number (unless it's the last one)
-      if (!isLast) {
-        await new Promise<void>((resolve) => {
-          setTimeout(() => {
-            const proceed = window.confirm(
-              `✅ ${actionType.toUpperCase()} for ${phoneNumber} completed!\n\nClick OK to proceed to the next number.`
-            );
-            if (proceed) {
-              resolve();
-            } else {
-              resolve(); // Still proceed even if they click cancel
-            }
-          }, 1000); // Small delay to let the action open first
+    return new Promise<void>((resolve) => {
+      try {
+        const message = "Your Son/daughter did not come to college today";
+        let actionUrl = "";
+        let status = "";
+        
+        switch (actionType) {
+          case "call":
+            actionUrl = `tel:${phoneNumber}`;
+            status = "call initiated";
+            toast.success(`📞 Calling ${phoneNumber}...`);
+            break;
+          case "sms":
+            actionUrl = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
+            status = "sms sent";
+            toast.success(`💬 Sending SMS to ${phoneNumber}...`);
+            break;
+          case "whatsapp":
+            actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(message)}`;
+            status = "whatsapp sent";
+            toast.success(`📱 Sending WhatsApp to ${phoneNumber}...`);
+            break;
+        }
+        
+        // Open the action URL
+        window.open(actionUrl, '_blank');
+        
+        // Log the action with detailed info
+        const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
+        logs.push({
+          number: phoneNumber,
+          timestamp: new Date().toISOString(),
+          status: status,
+          type: actionType
         });
+        localStorage.setItem("call_logs", JSON.stringify(logs));
+        
+        console.log(`✓ ${actionType.toUpperCase()} initiated for ${phoneNumber}`);
+      } catch (error) {
+        console.error('Error performing action:', error);
+        toast.error(`❌ Error processing ${phoneNumber}`);
+        
+        // Log failed action
+        const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
+        logs.push({
+          number: phoneNumber,
+          timestamp: new Date().toISOString(),
+          status: "failed",
+          type: actionType,
+          error: String(error)
+        });
+        localStorage.setItem("call_logs", JSON.stringify(logs));
       }
-    } catch (error) {
-      console.error('Error performing action:', error);
-      toast.error(`❌ Error processing ${phoneNumber}`);
       
-      // Log failed action
-      const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
-      logs.push({
-        number: phoneNumber,
-        timestamp: new Date().toISOString(),
-        status: "failed",
-        type: actionType,
-        error: String(error)
-      });
-      localStorage.setItem("call_logs", JSON.stringify(logs));
-    }
+      // Wait time for next action - longer for calls to allow time to complete the call
+      const delayTime = actionType === "call" ? 30000 : actionType === "sms" ? 5000 : 5000;
+      
+      if (!isLast) {
+        console.log(`⏱️ Waiting ${delayTime/1000}s before next action...`);
+        setTimeout(() => {
+          console.log(`✅ Moving to next number`);
+          resolve();
+        }, delayTime);
+      } else {
+        resolve();
+      }
+    });
   };
 
   const startAction = async () => {
@@ -240,7 +239,7 @@ const Call = () => {
                     📞 Current: {phoneNumbers[currentIndex]}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    ⏱️ Waiting for confirmation to proceed...
+                    ⏱️ Next in: {actionType === "call" ? "30s" : "5s"} (auto)
                   </p>
                 </div>
               )}
@@ -266,10 +265,10 @@ const Call = () => {
               <h3 className="text-sm font-semibold mb-2 text-foreground">📱 How It Works:</h3>
               <ul className="text-xs text-muted-foreground space-y-1">
                 <li>✓ Sequential processing - one at a time</li>
-                <li>✓ Alert confirmation between each action</li>
-                <li>✓ Click OK to proceed to next number</li>
+                <li>✓ Calls: 30s delay between each (time to complete call)</li>
+                <li>✓ SMS/WhatsApp: 5s delay between each</li>
+                <li>✓ Next action auto-initiates after delay</li>
                 <li>✓ All actions logged with timestamps</li>
-                <li>✓ Live progress tracking</li>
               </ul>
             </div>
           </div>
