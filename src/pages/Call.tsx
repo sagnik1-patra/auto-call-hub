@@ -54,8 +54,12 @@ const Call = () => {
             break;
         }
         
-        // Open the action URL
-        window.open(actionUrl, '_blank');
+        // Open the action URL - use location.href for tel/sms to work properly on mobile
+        if (actionType === "call" || actionType === "sms") {
+          window.location.href = actionUrl;
+        } else {
+          window.open(actionUrl, '_blank');
+        }
         
         // Log the action with detailed info
         const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
