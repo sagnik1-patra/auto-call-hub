@@ -29,70 +29,75 @@ const Call = () => {
     setFileName(savedFileName || "contacts.xlsx");
   }, [navigate]);
 
-  const performAction = async (phoneNumber: string) => {
-    return new Promise<void>((resolve) => {
-      try {
-        const message = "Your Son/daughter did not come to college today";
-        let actionUrl = "";
-        let status = "";
-        
-        switch (actionType) {
-          case "call":
-            actionUrl = `tel:${phoneNumber}`;
-            status = "call initiated";
-            toast.success(`📞 Calling ${phoneNumber}...`);
-            break;
-          case "sms":
-            actionUrl = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
-            status = "sms sent";
-            toast.success(`💬 Sending SMS to ${phoneNumber}...`);
-            break;
-          case "whatsapp":
-            actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(message)}`;
-            status = "whatsapp sent";
-            toast.success(`📱 Sending WhatsApp to ${phoneNumber}...`);
-            break;
-        }
-        
-        // Open the action URL
-        window.open(actionUrl, '_blank');
-        
-        // Log the action with detailed info
-        const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
-        logs.push({
-          number: phoneNumber,
-          timestamp: new Date().toISOString(),
-          status: status,
-          type: actionType
-        });
-        localStorage.setItem("call_logs", JSON.stringify(logs));
-        
-        console.log(`✓ ${actionType.toUpperCase()} initiated for ${phoneNumber}`);
-      } catch (error) {
-        console.error('Error performing action:', error);
-        toast.error(`❌ Error processing ${phoneNumber}`);
-        
-        // Log failed action
-        const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
-        logs.push({
-          number: phoneNumber,
-          timestamp: new Date().toISOString(),
-          status: "failed",
-          type: actionType,
-          error: String(error)
-        });
-        localStorage.setItem("call_logs", JSON.stringify(logs));
+  const performAction = async (phoneNumber: string, isLast: boolean) => {
+    try {
+      const message = "Your Son/daughter did not come to college today";
+      let actionUrl = "";
+      let status = "";
+      
+      switch (actionType) {
+        case "call":
+          actionUrl = `tel:${phoneNumber}`;
+          status = "call initiated";
+          toast.success(`📞 Calling ${phoneNumber}...`);
+          break;
+        case "sms":
+          actionUrl = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
+          status = "sms sent";
+          toast.success(`💬 Sending SMS to ${phoneNumber}...`);
+          break;
+        case "whatsapp":
+          actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(message)}`;
+          status = "whatsapp sent";
+          toast.success(`📱 Sending WhatsApp to ${phoneNumber}...`);
+          break;
       }
       
-      // Short delay: 5 seconds for calls, 3 seconds for SMS, 500ms for WhatsApp broadcast
-      const delayTime = actionType === "call" ? 5000 : (actionType === "whatsapp" && broadcastMode) ? 500 : 3000;
-      console.log(`⏱️ Waiting ${delayTime/1000}s before next action...`);
+      // Open the action URL
+      window.open(actionUrl, '_blank');
       
-      setTimeout(() => {
-        console.log(`✅ Moving to next number`);
-        resolve();
-      }, delayTime);
-    });
+      // Log the action with detailed info
+      const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
+      logs.push({
+        number: phoneNumber,
+        timestamp: new Date().toISOString(),
+        status: status,
+        type: actionType
+      });
+      localStorage.setItem("call_logs", JSON.stringify(logs));
+      
+      console.log(`✓ ${actionType.toUpperCase()} initiated for ${phoneNumber}`);
+      
+      // Show alert before proceeding to next number (unless it's the last one)
+      if (!isLast) {
+        await new Promise<void>((resolve) => {
+          setTimeout(() => {
+            const proceed = window.confirm(
+              `✅ ${actionType.toUpperCase()} for ${phoneNumber} completed!\n\nClick OK to proceed to the next number.`
+            );
+            if (proceed) {
+              resolve();
+            } else {
+              resolve(); // Still proceed even if they click cancel
+            }
+          }, 1000); // Small delay to let the action open first
+        });
+      }
+    } catch (error) {
+      console.error('Error performing action:', error);
+      toast.error(`❌ Error processing ${phoneNumber}`);
+      
+      // Log failed action
+      const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
+      logs.push({
+        number: phoneNumber,
+        timestamp: new Date().toISOString(),
+        status: "failed",
+        type: actionType,
+        error: String(error)
+      });
+      localStorage.setItem("call_logs", JSON.stringify(logs));
+    }
   };
 
   const startAction = async () => {
@@ -103,15 +108,10 @@ const Call = () => {
 
     setIsCalling(true);
     
-    if (actionType === "whatsapp" && broadcastMode) {
-      toast.success(`📱 Broadcasting to ${phoneNumbers.length} numbers...`, {
-        description: "Opening all WhatsApp chats quickly"
-      });
-    }
-    
     for (let i = 0; i < phoneNumbers.length; i++) {
       setCurrentIndex(i);
-      await performAction(phoneNumbers[i]);
+      const isLast = i === phoneNumbers.length - 1;
+      await performAction(phoneNumbers[i], isLast);
     }
     
     setIsCalling(false);
@@ -240,7 +240,7 @@ const Call = () => {
                     📞 Current: {phoneNumbers[currentIndex]}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    ⏱️ Next in: {actionType === "call" ? "5s" : (actionType === "whatsapp" && broadcastMode) ? "0.5s" : "3s"} after action
+                    ⏱️ Waiting for confirmation to proceed...
                   </p>
                 </div>
               )}
@@ -266,9 +266,8 @@ const Call = () => {
               <h3 className="text-sm font-semibold mb-2 text-foreground">📱 How It Works:</h3>
               <ul className="text-xs text-muted-foreground space-y-1">
                 <li>✓ Sequential processing - one at a time</li>
-                <li>✓ Calls: Auto-opens next call in 5 seconds</li>
-                <li>✓ SMS: 3-second delay between each</li>
-                <li>✓ WhatsApp: 3s delay (or 0.5s in broadcast mode)</li>
+                <li>✓ Alert confirmation between each action</li>
+                <li>✓ Click OK to proceed to next number</li>
                 <li>✓ All actions logged with timestamps</li>
                 <li>✓ Live progress tracking</li>
               </ul>
