@@ -14,6 +14,8 @@ const Call = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [actionType, setActionType] = useState<"call" | "sms" | "whatsapp">("call");
   const [broadcastMode, setBroadcastMode] = useState(false);
+  const [waitingForNext, setWaitingForNext] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
 
   useEffect(() => {
     const savedNumbers = localStorage.getItem("phone_numbers");
@@ -29,100 +31,98 @@ const Call = () => {
     setFileName(savedFileName || "contacts.xlsx");
   }, [navigate]);
 
-  const performAction = async (phoneNumber: string, isLast: boolean) => {
-    return new Promise<void>((resolve) => {
-      try {
-        const message = "Your Son/daughter did not come to college today";
-        let actionUrl = "";
-        let status = "";
-        
-        switch (actionType) {
-          case "call":
-            actionUrl = `tel:${phoneNumber}`;
-            status = "call initiated";
-            toast.success(`📞 Calling ${phoneNumber}...`);
-            break;
-          case "sms":
-            actionUrl = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
-            status = "sms sent";
-            toast.success(`💬 Sending SMS to ${phoneNumber}...`);
-            break;
-          case "whatsapp":
-            actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(message)}`;
-            status = "whatsapp sent";
-            toast.success(`📱 Sending WhatsApp to ${phoneNumber}...`);
-            break;
-        }
-        
-        // Open the action URL - use location.href for tel/sms to work properly on mobile
-        if (actionType === "call" || actionType === "sms") {
-          window.location.href = actionUrl;
-        } else {
-          window.open(actionUrl, '_blank');
-        }
-        
-        // Log the action with detailed info
-        const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
-        logs.push({
-          number: phoneNumber,
-          timestamp: new Date().toISOString(),
-          status: status,
-          type: actionType
-        });
-        localStorage.setItem("call_logs", JSON.stringify(logs));
-        
-        console.log(`✓ ${actionType.toUpperCase()} initiated for ${phoneNumber}`);
-      } catch (error) {
-        console.error('Error performing action:', error);
-        toast.error(`❌ Error processing ${phoneNumber}`);
-        
-        // Log failed action
-        const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
-        logs.push({
-          number: phoneNumber,
-          timestamp: new Date().toISOString(),
-          status: "failed",
-          type: actionType,
-          error: String(error)
-        });
-        localStorage.setItem("call_logs", JSON.stringify(logs));
+  const performAction = (phoneNumber: string) => {
+    try {
+      const message = "Your Son/daughter did not come to college today";
+      let actionUrl = "";
+      let status = "";
+      
+      switch (actionType) {
+        case "call":
+          actionUrl = `tel:${phoneNumber}`;
+          status = "call initiated";
+          toast.success(`📞 Calling ${phoneNumber}...`);
+          break;
+        case "sms":
+          actionUrl = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
+          status = "sms sent";
+          toast.success(`💬 Sending SMS to ${phoneNumber}...`);
+          break;
+        case "whatsapp":
+          actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(message)}`;
+          status = "whatsapp sent";
+          toast.success(`📱 Sending WhatsApp to ${phoneNumber}...`);
+          break;
       }
       
-      // Wait time for next action - longer for calls to allow time to complete the call
-      const delayTime = actionType === "call" ? 30000 : actionType === "sms" ? 5000 : 5000;
-      
-      if (!isLast) {
-        console.log(`⏱️ Waiting ${delayTime/1000}s before next action...`);
-        setTimeout(() => {
-          console.log(`✅ Moving to next number`);
-          resolve();
-        }, delayTime);
+      // Open the action URL - use location.href for tel/sms to work properly on mobile
+      if (actionType === "call" || actionType === "sms") {
+        window.location.href = actionUrl;
       } else {
-        resolve();
+        window.open(actionUrl, '_blank');
       }
-    });
+      
+      // Log the action with detailed info
+      const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
+      logs.push({
+        number: phoneNumber,
+        timestamp: new Date().toISOString(),
+        status: status,
+        type: actionType
+      });
+      localStorage.setItem("call_logs", JSON.stringify(logs));
+      
+      console.log(`✓ ${actionType.toUpperCase()} initiated for ${phoneNumber}`);
+    } catch (error) {
+      console.error('Error performing action:', error);
+      toast.error(`❌ Error processing ${phoneNumber}`);
+      
+      // Log failed action
+      const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
+      logs.push({
+        number: phoneNumber,
+        timestamp: new Date().toISOString(),
+        status: "failed",
+        type: actionType,
+        error: String(error)
+      });
+      localStorage.setItem("call_logs", JSON.stringify(logs));
+    }
   };
 
-  const startAction = async () => {
+  const startAction = () => {
     if (phoneNumbers.length === 0) {
       toast.error("No phone numbers available");
       return;
     }
 
     setIsCalling(true);
+    setCurrentIndex(0);
+    setWaitingForNext(false);
+    setIsComplete(false);
+    performAction(phoneNumbers[0]);
+    setWaitingForNext(true);
+  };
+
+  const handleNextAction = () => {
+    const nextIndex = currentIndex + 1;
     
-    for (let i = 0; i < phoneNumbers.length; i++) {
-      setCurrentIndex(i);
-      const isLast = i === phoneNumbers.length - 1;
-      await performAction(phoneNumbers[i], isLast);
+    if (nextIndex >= phoneNumbers.length) {
+      // All done
+      setIsCalling(false);
+      setWaitingForNext(false);
+      setIsComplete(true);
+      const actionText = actionType === "call" ? "calls" : actionType === "sms" ? "messages" : "WhatsApp messages";
+      toast.success(`All ${actionText} completed!`, {
+        description: "View the log for details",
+      });
+      setTimeout(() => navigate("/log"), 2000);
+      return;
     }
     
-    setIsCalling(false);
-    const actionText = actionType === "call" ? "calls" : actionType === "sms" ? "messages" : "WhatsApp messages";
-    toast.success(`All ${actionText} completed!`, {
-      description: "View the log for details",
-    });
-    setTimeout(() => navigate("/log"), 1500);
+    setCurrentIndex(nextIndex);
+    performAction(phoneNumbers[nextIndex]);
+    setWaitingForNext(true);
   };
 
   return (
@@ -223,11 +223,11 @@ const Call = () => {
                 )}
               </div>
               
-              {isCalling && (
-                <div className="bg-primary/10 border border-primary rounded-lg p-4 space-y-3 animate-pulse">
+              {(isCalling && waitingForNext) && (
+                <div className="bg-primary/10 border border-primary rounded-lg p-4 space-y-3">
                   <div className="flex justify-between items-center">
                     <p className="text-sm font-medium text-foreground">
-                      Processing: {currentIndex + 1} of {phoneNumbers.length}
+                      Completed: {currentIndex + 1} of {phoneNumbers.length}
                     </p>
                     <span className="text-xs text-primary font-semibold">
                       {Math.round(((currentIndex + 1) / phoneNumbers.length) * 100)}%
@@ -240,11 +240,25 @@ const Call = () => {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    📞 Current: {phoneNumbers[currentIndex]}
+                    ✅ Last: {phoneNumbers[currentIndex]}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    ⏱️ Next in: {actionType === "call" ? "30s" : "5s"} (auto)
-                  </p>
+                  {currentIndex + 1 < phoneNumbers.length && (
+                    <p className="text-xs text-muted-foreground">
+                      📞 Next: {phoneNumbers[currentIndex + 1]}
+                    </p>
+                  )}
+                  
+                  <Button 
+                    onClick={handleNextAction}
+                    className="w-full gap-2 mt-3"
+                    variant="default"
+                    size="lg"
+                  >
+                    {currentIndex + 1 < phoneNumbers.length 
+                      ? `Next ${actionType === "call" ? "Call" : actionType === "sms" ? "SMS" : "WhatsApp"} →`
+                      : "Finish & View Log"
+                    }
+                  </Button>
                 </div>
               )}
             </div>
@@ -259,8 +273,8 @@ const Call = () => {
               >
                 <Phone className="w-5 h-5" />
                 {isCalling 
-                  ? "Processing..." 
-                  : `Send ${actionType === "call" ? "Calls" : actionType === "sms" ? "SMS" : "WhatsApp"} (${phoneNumbers.length} numbers)`
+                  ? "In Progress..." 
+                  : `Start ${actionType === "call" ? "Calls" : actionType === "sms" ? "SMS" : "WhatsApp"} (${phoneNumbers.length} numbers)`
                 }
               </Button>
             </div>
@@ -268,10 +282,10 @@ const Call = () => {
             <div className="bg-secondary/50 border border-border rounded-lg p-4">
               <h3 className="text-sm font-semibold mb-2 text-foreground">📱 How It Works:</h3>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>✓ Sequential processing - one at a time</li>
-                <li>✓ Calls: 30s delay between each (time to complete call)</li>
-                <li>✓ SMS/WhatsApp: 5s delay between each</li>
-                <li>✓ Next action auto-initiates after delay</li>
+                <li>✓ Click Start to begin first call/SMS/WhatsApp</li>
+                <li>✓ Complete the action (call, send message, etc.)</li>
+                <li>✓ Return to this page</li>
+                <li>✓ Click "Next" button to proceed to next number</li>
                 <li>✓ All actions logged with timestamps</li>
               </ul>
             </div>
