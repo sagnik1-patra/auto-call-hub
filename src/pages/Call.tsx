@@ -17,6 +17,7 @@ const Call = () => {
   const [waitingForNext, setWaitingForNext] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [whatsappMessage, setWhatsappMessage] = useState("Your Son/daughter did not come to college today");
+  const [whatsappWindow, setWhatsappWindow] = useState<Window | null>(null);
 
   useEffect(() => {
     const savedNumbers = localStorage.getItem("phone_numbers");
@@ -59,6 +60,15 @@ const Call = () => {
       // Open the action URL - use location.href for tel/sms to work properly on mobile
       if (actionType === "call" || actionType === "sms") {
         window.location.href = actionUrl;
+      } else if (actionType === "whatsapp") {
+        // Reuse the same WhatsApp window/tab
+        if (whatsappWindow && !whatsappWindow.closed) {
+          whatsappWindow.location.href = actionUrl;
+          whatsappWindow.focus();
+        } else {
+          const newWindow = window.open(actionUrl, 'whatsapp_tab');
+          setWhatsappWindow(newWindow);
+        }
       } else {
         window.open(actionUrl, '_blank');
       }
@@ -130,6 +140,9 @@ const Call = () => {
       return;
     }
 
+    // Reset WhatsApp window for new session
+    setWhatsappWindow(null);
+    
     setIsCalling(true);
     setCurrentIndex(0);
     setWaitingForNext(false);
