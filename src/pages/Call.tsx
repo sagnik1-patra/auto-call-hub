@@ -16,6 +16,7 @@ const Call = () => {
   const [broadcastMode, setBroadcastMode] = useState(false);
   const [waitingForNext, setWaitingForNext] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [whatsappMessage, setWhatsappMessage] = useState("Your Son/daughter did not come to college today");
 
   useEffect(() => {
     const savedNumbers = localStorage.getItem("phone_numbers");
@@ -49,9 +50,9 @@ const Call = () => {
           toast.success(`💬 Sending SMS to ${phoneNumber}...`);
           break;
         case "whatsapp":
-          actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(message)}`;
+          actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(whatsappMessage)}`;
           status = "whatsapp sent";
-          toast.success(`📱 Sending WhatsApp to ${phoneNumber}...`);
+          toast.success(`📱 Opening WhatsApp for ${phoneNumber}...`);
           break;
       }
       
@@ -93,6 +94,39 @@ const Call = () => {
   const startAction = () => {
     if (phoneNumbers.length === 0) {
       toast.error("No phone numbers available");
+      return;
+    }
+
+    if (actionType === "whatsapp" && !whatsappMessage.trim()) {
+      toast.error("Please enter a message for WhatsApp");
+      return;
+    }
+
+    if (broadcastMode && actionType === "whatsapp") {
+      // Open all WhatsApp chats at once
+      phoneNumbers.forEach((phoneNumber, index) => {
+        setTimeout(() => {
+          const actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(whatsappMessage)}`;
+          window.open(actionUrl, '_blank');
+          
+          const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
+          logs.push({
+            number: phoneNumber,
+            timestamp: new Date().toISOString(),
+            status: "whatsapp opened",
+            type: "whatsapp"
+          });
+          localStorage.setItem("call_logs", JSON.stringify(logs));
+        }, index * 500); // 500ms delay between each
+      });
+      
+      toast.success(`Opening ${phoneNumbers.length} WhatsApp chats...`, {
+        description: "Send your message in each chat, then check the log",
+      });
+      
+      setTimeout(() => {
+        navigate("/log");
+      }, phoneNumbers.length * 500 + 2000);
       return;
     }
 
@@ -197,7 +231,7 @@ const Call = () => {
                 </div>
                 
                 {actionType === "whatsapp" && (
-                  <div className="mt-3 p-3 bg-primary/10 border border-primary/20 rounded-lg space-y-2">
+                  <div className="mt-3 p-3 bg-primary/10 border border-primary/20 rounded-lg space-y-3">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -207,12 +241,18 @@ const Call = () => {
                         className="w-4 h-4 rounded"
                       />
                       <label htmlFor="broadcast" className="text-xs font-medium text-foreground cursor-pointer">
-                        🚀 Broadcast Mode (Opens all chats quickly)
+                        🚀 Broadcast Mode (Opens all chats at once - fastest!)
                       </label>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Message: "Your Son/daughter did not come to college today"
-                    </p>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-foreground">Your Message:</label>
+                      <textarea
+                        value={whatsappMessage}
+                        onChange={(e) => setWhatsappMessage(e.target.value)}
+                        placeholder="Enter your WhatsApp message..."
+                        className="w-full min-h-[80px] p-2 text-sm rounded-md border border-input bg-background"
+                      />
+                    </div>
                   </div>
                 )}
                 
