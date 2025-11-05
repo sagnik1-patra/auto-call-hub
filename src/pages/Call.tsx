@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Phone, FileText } from "lucide-react";
+import { Phone, FileText, Mic, Square } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { supabase } from "@/integrations/supabase/client";
 
 const Call = () => {
   const navigate = useNavigate();
@@ -18,6 +19,10 @@ const Call = () => {
   const [isComplete, setIsComplete] = useState(false);
   const [whatsappMessage, setWhatsappMessage] = useState("Your Son/daughter did not come to college today");
   const [whatsappWindow, setWhatsappWindow] = useState<Window | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [currentCallLogId, setCurrentCallLogId] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     const savedNumbers = localStorage.getItem("phone_numbers");
@@ -32,6 +37,81 @@ const Call = () => {
     setPhoneNumbers(JSON.parse(savedNumbers));
     setFileName(savedFileName || "contacts.xlsx");
   }, [navigate]);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        await uploadRecording(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      toast.success("Recording started");
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      toast.error("Failed to start recording. Please allow microphone access.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      toast.success("Recording stopped");
+    }
+  };
+
+  const uploadRecording = async (audioBlob: Blob) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Please log in to save recordings");
+        return;
+      }
+
+      const fileName = `recording_${Date.now()}.webm`;
+      const filePath = `${user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('call-recordings')
+        .upload(filePath, audioBlob);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('call-recordings')
+        .getPublicUrl(filePath);
+
+      const { error: dbError } = await supabase
+        .from('call_recordings')
+        .insert({
+          user_id: user.id,
+          log_id: currentCallLogId,
+          phone_number: phoneNumbers[currentIndex],
+          recording_url: publicUrl,
+        });
+
+      if (dbError) throw dbError;
+
+      toast.success("Recording saved successfully!");
+    } catch (error) {
+      console.error('Error uploading recording:', error);
+      toast.error("Failed to save recording");
+    }
+  };
 
   const performAction = (phoneNumber: string) => {
     try {
@@ -101,7 +181,7 @@ const Call = () => {
     }
   };
 
-  const startAction = () => {
+  const startAction = async () => {
     if (phoneNumbers.length === 0) {
       toast.error("No phone numbers available");
       return;
@@ -138,6 +218,29 @@ const Call = () => {
         navigate("/log");
       }, phoneNumbers.length * 500 + 2000);
       return;
+    }
+
+    // Create a call log session
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data, error } = await supabase
+          .from('call_logs')
+          .insert({
+            user_id: user.id,
+            session_name: fileName,
+            total_calls: phoneNumbers.length,
+            completed_calls: 0,
+          })
+          .select()
+          .single();
+
+        if (!error && data) {
+          setCurrentCallLogId(data.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error creating call log:', error);
     }
 
     // Reset WhatsApp window for new session
@@ -299,6 +402,29 @@ const Call = () => {
                     <p className="text-xs text-muted-foreground">
                       📞 Next: {phoneNumbers[currentIndex + 1]}
                     </p>
+                  )}
+
+                  {actionType === "call" && (
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={isRecording ? stopRecording : startRecording}
+                        variant={isRecording ? "destructive" : "outline"}
+                        size="sm"
+                        className="gap-2"
+                      >
+                        {isRecording ? (
+                          <>
+                            <Square className="w-4 h-4" />
+                            Stop Recording
+                          </>
+                        ) : (
+                          <>
+                            <Mic className="w-4 h-4" />
+                            Record Call
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   )}
                   
                   <Button 
