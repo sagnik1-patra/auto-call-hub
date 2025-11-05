@@ -14,7 +14,83 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      call_logs: {
+        Row: {
+          completed_calls: number | null
+          created_at: string
+          id: string
+          session_name: string | null
+          total_calls: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_calls?: number | null
+          created_at?: string
+          id?: string
+          session_name?: string | null
+          total_calls?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_calls?: number | null
+          created_at?: string
+          id?: string
+          session_name?: string | null
+          total_calls?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      call_recordings: {
+        Row: {
+          created_at: string
+          id: string
+          log_id: string | null
+          notes: string | null
+          phone_number: string
+          rating: number | null
+          recording_url: string | null
+          transcript: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          log_id?: string | null
+          notes?: string | null
+          phone_number: string
+          rating?: number | null
+          recording_url?: string | null
+          transcript?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          log_id?: string | null
+          notes?: string | null
+          phone_number?: string
+          rating?: number | null
+          recording_url?: string | null
+          transcript?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_recordings_log_id_fkey"
+            columns: ["log_id"]
+            isOneToOne: false
+            referencedRelation: "call_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
