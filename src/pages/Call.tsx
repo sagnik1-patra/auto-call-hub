@@ -91,9 +91,12 @@ const Call = () => {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
+      // Get a signed URL that will work for 1 year
+      const { data: signedUrlData, error: urlError } = await supabase.storage
         .from('call-recordings')
-        .getPublicUrl(filePath);
+        .createSignedUrl(filePath, 31536000); // 1 year in seconds
+
+      if (urlError) throw urlError;
 
       const { error: dbError } = await supabase
         .from('call_recordings')
@@ -101,7 +104,7 @@ const Call = () => {
           user_id: user.id,
           log_id: currentCallLogId,
           phone_number: phoneNumbers[currentIndex],
-          recording_url: publicUrl,
+          recording_url: signedUrlData.signedUrl,
         });
 
       if (dbError) throw dbError;
