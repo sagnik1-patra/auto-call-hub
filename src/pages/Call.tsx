@@ -148,25 +148,34 @@ const Call = () => {
     // Copy message to clipboard
     await copyMessageToClipboard();
 
-    // Open WhatsApp for each selected number
-    selectedNumbers.forEach((phoneNumber, index) => {
-      setTimeout(() => {
-        const actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(whatsappMessage)}`;
-        window.open(actionUrl, '_blank');
-        
-        const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
-        logs.push({
-          number: phoneNumber,
-          timestamp: new Date().toISOString(),
-          status: "quick share opened",
-          type: "whatsapp"
-        });
-        localStorage.setItem("call_logs", JSON.stringify(logs));
-      }, index * 800); // 800ms delay for better reliability
+    // Open all WhatsApp windows immediately (to avoid popup blocker)
+    const windows: (Window | null)[] = [];
+    selectedNumbers.forEach((phoneNumber) => {
+      const actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(whatsappMessage)}`;
+      const newWindow = window.open(actionUrl, `whatsapp_${phoneNumber}`);
+      windows.push(newWindow);
+      
+      const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
+      logs.push({
+        number: phoneNumber,
+        timestamp: new Date().toISOString(),
+        status: "quick share opened",
+        type: "whatsapp"
+      });
+      localStorage.setItem("call_logs", JSON.stringify(logs));
+    });
+
+    // Focus windows sequentially with delays
+    windows.forEach((win, index) => {
+      if (win) {
+        setTimeout(() => {
+          win.focus();
+        }, index * 800);
+      }
     });
 
     toast.success(`Opening ${selectedNumbers.length} WhatsApp chats...`, {
-      description: "Message copied! Paste and send in each chat",
+      description: "Message is pre-filled in each chat - just hit send!",
       duration: 5000,
     });
   };
