@@ -23,6 +23,8 @@ const Call = () => {
   const [currentCallLogId, setCurrentCallLogId] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const [selectedNumbers, setSelectedNumbers] = useState<string[]>([]);
+  const [showQuickShare, setShowQuickShare] = useState(false);
 
   useEffect(() => {
     const savedNumbers = localStorage.getItem("phone_numbers");
@@ -116,6 +118,71 @@ const Call = () => {
     }
   };
 
+  const copyMessageToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(whatsappMessage);
+      toast.success("Message copied to clipboard!", {
+        description: "Paste it in WhatsApp and send"
+      });
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  };
+
+  const handleQuickShare = async () => {
+    if (selectedNumbers.length === 0) {
+      toast.error("Please select at least 1 number");
+      return;
+    }
+
+    if (selectedNumbers.length > 5) {
+      toast.error("Please select maximum 5 numbers");
+      return;
+    }
+
+    if (!whatsappMessage.trim()) {
+      toast.error("Please enter a message");
+      return;
+    }
+
+    // Copy message to clipboard
+    await copyMessageToClipboard();
+
+    // Open WhatsApp for each selected number
+    selectedNumbers.forEach((phoneNumber, index) => {
+      setTimeout(() => {
+        const actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(whatsappMessage)}`;
+        window.open(actionUrl, '_blank');
+        
+        const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
+        logs.push({
+          number: phoneNumber,
+          timestamp: new Date().toISOString(),
+          status: "quick share opened",
+          type: "whatsapp"
+        });
+        localStorage.setItem("call_logs", JSON.stringify(logs));
+      }, index * 800); // 800ms delay for better reliability
+    });
+
+    toast.success(`Opening ${selectedNumbers.length} WhatsApp chats...`, {
+      description: "Message copied! Paste and send in each chat",
+      duration: 5000,
+    });
+  };
+
+  const toggleNumberSelection = (number: string) => {
+    if (selectedNumbers.includes(number)) {
+      setSelectedNumbers(selectedNumbers.filter(n => n !== number));
+    } else {
+      if (selectedNumbers.length < 5) {
+        setSelectedNumbers([...selectedNumbers, number]);
+      } else {
+        toast.error("Maximum 5 numbers can be selected");
+      }
+    }
+  };
+
   const performAction = (phoneNumber: string) => {
     try {
       const message = "Your Son/daughter did not come to college today";
@@ -134,9 +201,13 @@ const Call = () => {
           toast.success(`💬 Sending SMS to ${phoneNumber}...`);
           break;
         case "whatsapp":
+          // Copy message to clipboard for easier pasting
+          copyMessageToClipboard();
           actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(whatsappMessage)}`;
           status = "whatsapp sent";
-          toast.success(`📱 Opening WhatsApp for ${phoneNumber}...`);
+          toast.success(`📱 Opening WhatsApp for ${phoneNumber}...`, {
+            description: "Message copied! Paste and send"
+          });
           break;
       }
       
@@ -360,7 +431,7 @@ const Call = () => {
                         className="w-4 h-4 rounded"
                       />
                       <label htmlFor="broadcast" className="text-xs font-medium text-foreground cursor-pointer">
-                        🚀 Broadcast Mode (Opens all chats at once - fastest!)
+                        🚀 Broadcast Mode (Opens all chats at once)
                       </label>
                     </div>
                     <div className="space-y-2">
@@ -371,7 +442,68 @@ const Call = () => {
                         placeholder="Enter your WhatsApp message..."
                         className="w-full min-h-[80px] p-2 text-sm rounded-md border border-input bg-background"
                       />
+                      <Button
+                        onClick={copyMessageToClipboard}
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                      >
+                        📋 Copy Message
+                      </Button>
                     </div>
+                    
+                    <div className="pt-2 border-t border-primary/20">
+                      <Button
+                        onClick={() => setShowQuickShare(!showQuickShare)}
+                        variant="secondary"
+                        size="sm"
+                        className="w-full"
+                      >
+                        ⚡ Quick Share (Select up to 5 numbers)
+                      </Button>
+                    </div>
+
+                    {showQuickShare && (
+                      <div className="space-y-2 pt-2 border-t border-primary/20">
+                        <p className="text-xs font-medium text-foreground">
+                          Select up to 5 numbers ({selectedNumbers.length}/5 selected):
+                        </p>
+                        <div className="max-h-40 overflow-y-auto space-y-1">
+                          {phoneNumbers.slice(0, 20).map((number, index) => (
+                            <div
+                              key={index}
+                              onClick={() => toggleNumberSelection(number)}
+                              className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                                selectedNumbers.includes(number)
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-secondary hover:bg-secondary/80'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedNumbers.includes(number)}
+                                onChange={() => {}}
+                                className="w-4 h-4"
+                              />
+                              <span className="text-xs">{number}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {phoneNumbers.length > 20 && (
+                          <p className="text-xs text-muted-foreground">
+                            Showing first 20 numbers only
+                          </p>
+                        )}
+                        <Button
+                          onClick={handleQuickShare}
+                          disabled={selectedNumbers.length === 0}
+                          className="w-full gap-2"
+                          size="sm"
+                        >
+                          📱 Send to {selectedNumbers.length} Selected
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
                 
