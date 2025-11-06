@@ -151,8 +151,9 @@ const Call = () => {
     // Open all WhatsApp windows immediately (to avoid popup blocker)
     const windows: (Window | null)[] = [];
     selectedNumbers.forEach((phoneNumber) => {
-      const actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(whatsappMessage)}`;
-      const newWindow = window.open(actionUrl, `whatsapp_${phoneNumber}`);
+      const cleanNumber = phoneNumber.trim();
+      const actionUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(whatsappMessage)}`;
+      const newWindow = window.open(actionUrl, `whatsapp_${cleanNumber}`);
       windows.push(newWindow);
       
       const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
@@ -212,7 +213,8 @@ const Call = () => {
         case "whatsapp":
           // Copy message to clipboard for easier pasting
           copyMessageToClipboard();
-          actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(whatsappMessage)}`;
+          const cleanNumber = phoneNumber.trim();
+          actionUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(whatsappMessage)}`;
           status = "whatsapp sent";
           toast.success(`📱 Opening WhatsApp for ${phoneNumber}...`, {
             description: "Message copied! Paste and send"
@@ -279,7 +281,8 @@ const Call = () => {
       // Open all WhatsApp chats at once
       phoneNumbers.forEach((phoneNumber, index) => {
         setTimeout(() => {
-          const actionUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(whatsappMessage)}`;
+          const cleanNumber = phoneNumber.trim();
+          const actionUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(whatsappMessage)}`;
           window.open(actionUrl, '_blank');
           
           const logs = JSON.parse(localStorage.getItem("call_logs") || "[]");
